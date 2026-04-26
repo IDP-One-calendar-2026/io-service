@@ -29,7 +29,7 @@ jobs:
       - name: Read version from package.json
         id: pkg
         run: |
-          echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${pkg.version}\n`);"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
