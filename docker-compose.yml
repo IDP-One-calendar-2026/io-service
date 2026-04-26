@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  io-service-db:
+    image: postgres:16-alpine
+    container_name: io-service-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER_IO_SERVICE}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_IO_SERVICE}
+      POSTGRES_DB: ${DB_NAME_IO_SERVICE}
+    ports:
+      - "${DB_PORT_IO_SERVICE}:5432"
+    volumes:
+      - io_service_db_data:/var/lib/postgresql/data
+
+volumes:
+  io_service_db_data:

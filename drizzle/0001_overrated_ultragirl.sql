@@ -1,0 +1,1 @@
+ALTER TABLE "days" ADD CONSTRAINT "days_eventId_events_id_fk" FOREIGN KEY ("eventId") REFERENCES "public"."events"("id") ON DELETE cascade ON UPDATE no action;

@@ -1,0 +1,44 @@
+{
+  "name": "io-service",
+  "version": "0.0.1",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./app": {
+      "types": "./dist/app.d.ts",
+      "import": "./dist/app.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "pnpm pack:business-logic && tsx watch src/index.ts",
+    "build": "tsc",
+    "prepack": "pnpm build",
+    "pack:business-logic": "pnpm pack --pack-destination ../business-logic-service/vendor",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.14",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.14",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}
