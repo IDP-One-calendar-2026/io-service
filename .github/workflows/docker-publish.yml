@@ -17,14 +17,21 @@ env:
 
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: read
       packages: write
+    outputs:
+      short-sha: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Read short git sha
+        id: version
+        run: |
+          echo "version=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Read version from package.json
         id: pkg
@@ -65,3 +72,80 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: docker
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    env:
+      PORTAINER_IO_SERVICE_WEBHOOK_URL: ${{ secrets.PORTAINER_IO_SERVICE_WEBHOOK_URL }}
+    steps:
+      - name: Deploy to Portainer via Webhook
+        run: |
+          echo "Deploying image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.docker.outputs.short-sha }}"
+
+          trigger_portainer_webhook() {
+            local name="$1"
+            local url="$2"
+
+            if [ -z "$url" ]; then
+              echo "ℹ️  Skipping $name webhook because URL is empty"
+              return 0
+            fi
+
+            echo "➡️  Triggering $name webhook"
+
+            local response
+            local curl_exit
+            local http_status
+            local response_body
+
+            set +e
+            response=$(curl -sS -L -X POST "$url" \
+              -H "Content-Type: application/json" \
+              --data '{}' \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --retry 2 \
+              --retry-delay 2 \
+              -w "HTTPSTATUS:%{http_code}")
+            curl_exit=$?
+            set -e
+
+            if [ "$curl_exit" -eq 60 ]; then
+              echo "⚠️  TLS verification failed for $name webhook. Retrying with --insecure."
+              set +e
+              response=$(curl -sS -L -X POST "$url" \
+                -H "Content-Type: application/json" \
+                --data '{}' \
+                --connect-timeout 10 \
+                --max-time 30 \
+                --retry 2 \
+                --retry-delay 2 \
+                --insecure \
+                -w "HTTPSTATUS:%{http_code}")
+              curl_exit=$?
+              set -e
+            fi
+
+            if [ "$curl_exit" -ne 0 ]; then
+              echo "❌ $name webhook request failed before HTTP response (curl exit: $curl_exit)"
+              exit 1
+            fi
+
+            http_status=$(printf '%s' "$response" | sed -e 's/.*HTTPSTATUS://')
+            response_body=$(printf '%s' "$response" | sed -e 's/HTTPSTATUS:.*//')
+
+            if [ "$http_status" -ne 200 ] && [ "$http_status" -ne 202 ] && [ "$http_status" -ne 204 ]; then
+              echo "❌ $name webhook failed with HTTP status: $http_status"
+              if [ -n "$response_body" ]; then
+                echo "Response body:"
+                echo "$response_body"
+              fi
+              exit 1
+            fi
+
+            echo "✅ $name webhook triggered successfully (HTTP $http_status)"
+          }
+
+          trigger_portainer_webhook "Service deployment" "${PORTAINER_IO_SERVICE_WEBHOOK_URL:-}"
